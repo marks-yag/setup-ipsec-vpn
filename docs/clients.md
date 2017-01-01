@@ -17,6 +17,11 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
   * [Chromebook](#chromebook)
   * [Windows Phone](#windows-phone)
   * [Linux](#linux)
+* [Troubleshooting](#troubleshooting)
+  * [Windows Error 809](#windows-error-809)
+  * [Windows Error 628](#windows-error-628)
+  * [Android 6 and 7](#android-6-and-7)
+  * [Other Errors](#other-errors)
 
 ## Windows
 
@@ -32,7 +37,7 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
 1. Return to **Network and Sharing Center**. On the left, click **Change adapter settings**.
 1. Right-click on the new VPN entry and choose **Properties**.
 1. Click the **Security** tab. Select "Layer 2 Tunneling Protocol with IPsec (L2TP/IPSec)" for the **Type of VPN**.
-1. Click **Allow these protocols**. Check "Challenge Handshake Authentication Protocol (CHAP)" and uncheck all others.
+1. Click **Allow these protocols**. Be sure to select the "Challenge Handshake Authentication Protocol (CHAP)" checkbox.
 1. Click the **Advanced settings** button.
 1. Select **Use preshared key for authentication** and enter `Your VPN IPsec PSK` for the **Key**.
 1. Click **OK** to close the **Advanced settings**.
@@ -58,7 +63,7 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
 1. Right-click on the new VPN entry and choose **Properties**.
 1. Click the **Options** tab and uncheck **Include Windows logon domain**.
 1. Click the **Security** tab. Select "Layer 2 Tunneling Protocol with IPsec (L2TP/IPSec)" for the **Type of VPN**.
-1. Click **Allow these protocols**. Check "Challenge Handshake Authentication Protocol (CHAP)" and uncheck all others.
+1. Click **Allow these protocols**. Be sure to select the "Challenge Handshake Authentication Protocol (CHAP)" checkbox.
 1. Click the **Advanced settings** button.
 1. Select **Use preshared key for authentication** and enter `Your VPN IPsec PSK` for the **Key**.
 1. Click **OK** to close the **Advanced settings**.
@@ -145,55 +150,193 @@ Once connected, you will see a VPN icon overlay on the network status icon. You 
 
 ## Windows Phone
 
-Users with Windows Phone 8.1 and newer, try <a href="http://forums.windowscentral.com/windows-phone-8-1-preview-developers/301521-tutorials-windows-phone-8-1-support-l2tp-ipsec-vpn-now.html" target="_blank">this tutorial</a>. Please note that IPsec/L2TP support on this platform may have some issues. You can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
+Users with Windows Phone 8.1 and above, try <a href="http://forums.windowscentral.com/windows-phone-8-1-preview-developers/301521-tutorials-windows-phone-8-1-support-l2tp-ipsec-vpn-now.html" target="_blank">this tutorial</a>. You can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
 
 ## Linux
 
-### Ubuntu & Debian
+Note: Instructions below are adapted from [the work of Peter Sanford](https://gist.github.com/psanford/42c550a1a6ad3cb70b13e4aaa94ddb1c). Commands must be run as `root` on your VPN client.
 
-Follow the steps in <a href="http://www.jasonernst.com/2016/06/21/l2tp-ipsec-vpn-on-ubuntu-16-04/" target="_blank">this tutorial</a>. Some corrections are required:
+To set up the VPN client, first install the following packages:
 
-1. In `xl2tpd.conf`, remove the line `# your vpn server goes here`. 
-1. In `options.l2tpd.client`, replace `require-mschap-v2` with `require-chap`.
-1. Replace `sudo echo "c XXX-YOUR-CONNECTION-NAME-XXX <user> <pass>" > /var/run/xl2tpd/l2tp-control` with:
-
-   ```
-   echo "c XXX-YOUR-CONNECTION-NAME-XXX <user> <pass>" | sudo tee /var/run/xl2tpd/l2tp-control
-   ```
-
-1. Replace the last command `sudo route add -net default gw <vpn server local ip>` with:
-
-   ```
-   sudo route add default dev ppp0
-   ```
-
-   If there is an error, check the output of `ifconfig` and replace `ppp0` above with `ppp1`, etc.
-
-Once connected, verify that your traffic is being routed properly:
 ```
-wget -qO- http://whatismyip.akamai.com; echo
+# Ubuntu & Debian
+apt-get update
+apt-get -y install strongswan xl2tpd
+
+# CentOS & RHEL
+yum -y install epel-release
+yum -y install strongswan xl2tpd
+
+# Fedora
+yum -y install strongswan xl2tpd
+```
+
+Create VPN variables (replace with actual values):
+
+```
+VPN_SERVER_IP='your_vpn_server_ip'
+VPN_IPSEC_PSK='your_ipsec_pre_shared_key'
+VPN_USER='your_vpn_username'
+VPN_PASSWORD='your_vpn_password'
+```
+
+Configure strongSwan:
+```
+cat > /etc/ipsec.conf <<EOF
+# ipsec.conf - strongSwan IPsec configuration file
+
+# basic configuration
+
+config setup
+  # strictcrlpolicy=yes
+  # uniqueids = no
+
+# Add connections here.
+
+# Sample VPN connections
+
+conn %default
+  ikelifetime=60m
+  keylife=20m
+  rekeymargin=3m
+  keyingtries=1
+  keyexchange=ikev1
+  authby=secret
+  ike=aes128-sha1-modp1024,3des-sha1-modp1024!
+  esp=aes128-sha1-modp1024,3des-sha1-modp1024!
+
+conn myvpn
+  keyexchange=ikev1
+  left=%defaultroute
+  auto=add
+  authby=secret
+  type=transport
+  leftprotoport=17/1701
+  rightprotoport=17/1701
+  right=$VPN_SERVER_IP
+EOF
+
+cat > /etc/ipsec.secrets <<EOF
+: PSK "$VPN_IPSEC_PSK"
+EOF
+
+chmod 600 /etc/ipsec.secrets
+
+# For CentOS/RHEL & Fedora ONLY
+mv /etc/strongswan/ipsec.conf /etc/strongswan/ipsec.conf.old 2>/dev/null
+mv /etc/strongswan/ipsec.secrets /etc/strongswan/ipsec.secrets.old 2>/dev/null
+ln -s /etc/ipsec.conf /etc/strongswan/ipsec.conf
+ln -s /etc/ipsec.secrets /etc/strongswan/ipsec.secrets
+```
+
+Configure xl2tpd:
+```
+cat > /etc/xl2tpd/xl2tpd.conf <<EOF
+[lac myvpn]
+lns = $VPN_SERVER_IP
+ppp debug = yes
+pppoptfile = /etc/ppp/options.l2tpd.client
+length bit = yes
+EOF
+
+cat > /etc/ppp/options.l2tpd.client <<EOF
+ipcp-accept-local
+ipcp-accept-remote
+refuse-eap
+require-chap
+noccp
+noauth
+mtu 1280
+mru 1280
+noipdefault
+defaultroute
+usepeerdns
+connect-delay 5000
+name $VPN_USER
+password $VPN_PASSWORD
+EOF
+
+chmod 600 /etc/ppp/options.l2tpd.client
+```
+
+The VPN client setup is now complete. Follow the steps below to connect.
+
+Create xl2tpd control file:
+```
+mkdir -p /var/run/xl2tpd
+touch /var/run/xl2tpd/l2tp-control
+```
+
+Restart services:
+```
+service strongswan restart
+service xl2tpd restart
+```
+
+Start the IPsec connection:
+```
+# Ubuntu & Debian
+ipsec up myvpn
+
+# CentOS/RHEL & Fedora
+strongswan up myvpn
+```
+
+Start the L2TP connection:
+```
+echo "c myvpn" > /var/run/xl2tpd/l2tp-control
+```
+
+Run `ifconfig` and check the output. You should now see a new interface `ppp0`.
+
+Check your existing default route:
+```
+ip route
+```
+
+Find this line in the output: `default via X.X.X.X ...`. Write down this gateway IP for use in the two commands below.
+
+Exclude your VPN server's IP from the new default route (replace with actual value):
+```
+route add YOUR_VPN_SERVER_IP gw X.X.X.X
+```
+
+If your VPN client is a remote server, you must also exclude your Local PC's public IP from the new default route, to prevent your SSH session from being disconnected (replace with your actual public IP <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">from here</a>):
+```
+route add YOUR_LOCAL_PC_PUBLIC_IP gw X.X.X.X
+```
+
+Add a new default route to start routing traffic via the VPN server：
+```
+route add default dev ppp0
+```
+
+The VPN connection is now complete. Verify that your traffic is being routed properly:
+```
+wget -qO- http://ipv4.icanhazip.com; echo
 ```
 
 The above command should return `Your VPN Server IP`.
 
 To stop routing traffic via the VPN server:
 ```
-sudo route del default dev ppp0
+route del default dev ppp0
 ```
 
-### CentOS & Fedora
+To disconnect:
+```
+# Ubuntu & Debian
+echo "d myvpn" > /var/run/xl2tpd/l2tp-control
+ipsec down myvpn
 
-Refer to the Ubuntu/Debian section above, with these changes:
-
-1. Use `yum` instead of `apt-get` to install packages.
-1. In these systems, the `ipsec` command has been renamed to `strongswan`.
-1. The files `ipsec.conf` and `ipsec.secrets` should be saved under `/etc/strongswan`.
-
-### Other Linux
-
-If your system provides the `strongswan` package, refer to the two sections above.
+# CentOS/RHEL & Fedora
+echo "d myvpn" > /var/run/xl2tpd/l2tp-control
+strongswan down myvpn
+```
 
 ## Troubleshooting
+
+*Read this in other languages: [English](clients.md#troubleshooting), [简体中文](clients-zh.md#故障排除).*
 
 ### Windows Error 809
 
@@ -201,7 +344,7 @@ If your system provides the `strongswan` package, refer to the two sections abov
 
 To fix this error, a <a href="https://documentation.meraki.com/MX-Z/Client_VPN/Troubleshooting_Client_VPN#Windows_Error_809" target="_blank">one-time registry change</a> is required because the VPN server and/or client is behind NAT (e.g. home router). Refer to the linked web page, or run the following from an <a href="http://www.winhelponline.com/blog/open-elevated-command-prompt-windows/" target="_blank">elevated command prompt</a>. When finished, reboot your PC.
 
-- For Windows Vista, 7, 8 and 10
+- For Windows Vista, 7, 8.x and 10
   ```console
   REG ADD HKLM\SYSTEM\CurrentControlSet\Services\PolicyAgent /v AssumeUDPEncapsulationContextOnSendRule /t REG_DWORD /d 0x2 /f
   ```
@@ -220,29 +363,34 @@ To fix this error, please follow these steps:
 1. Right-click on the wireless/network icon in system tray, select **Open Network and Sharing Center**.
 1. On the left, click **Change adapter settings**. Right-click on the new VPN and choose **Properties**.
 1. Click the **Security** tab. Select "Layer 2 Tunneling Protocol with IPsec (L2TP/IPSec)" for **Type of VPN**.
-1. Click **Allow these protocols**. Check "Challenge Handshake Authentication Protocol (CHAP)" and uncheck all others.
+1. Click **Allow these protocols**. Be sure to select the "Challenge Handshake Authentication Protocol (CHAP)" checkbox.
+1. Click the **Advanced settings** button.
+1. Select **Use preshared key for authentication** and enter `Your VPN IPsec PSK` for the **Key**.
+1. Click **OK** to close the **Advanced settings**.
 1. Click **OK** to save the VPN connection details.
 
 ![Select CHAP in VPN connection properties](images/vpn-properties.png)
 
-### Android 6.0 and 7.0
+### Android 6 and 7
 
-If you are unable to connect using Android 6.0 (Marshmallow) or 7.0 (Nougat), try these workarounds:
+If you are unable to connect using Android 6 (Marshmallow) or 7 (Nougat):
 
-1. Tap the "Settings" icon next to your VPN profile. Select "Show Advanced Options" and scroll down to the bottom. If the option "Backwards-compatible mode" exists, enable it and reconnect the VPN. If not, see the next step.
-1. (Note: The latest version of VPN scripts already includes these changes) Edit `/etc/ipsec.conf` on the VPN server and append `,aes256-sha2_256` to both `ike=` and `phase2alg=` lines. Then add a new line `sha2-truncbug=yes` immediately after those. Indent lines with two spaces. Save the file and run `service ipsec restart`. (<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">Ref</a>)
+1. Tap the "Settings" icon next to your VPN profile. Select "Show advanced options" and scroll down to the bottom. If the option "Backward compatible mode" exists, enable it and reconnect the VPN. If not, try the next step.
+1. Edit `/etc/ipsec.conf` on the VPN server. Find the line `phase2alg=...`, and add a new line `sha2-truncbug=yes` immediately below it, indented with two spaces. Save the file and run `service ipsec restart`. (<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">Ref</a>)
+
+![Android VPN workaround](images/vpn-profile-Android.png)
 
 ### Other Errors
 
 Refer to the links below for more troubleshooting tips:
 
-https://documentation.meraki.com/MX-Z/Client_VPN/Troubleshooting_Client_VPN#Common_Connection_Issues   
-https://blogs.technet.microsoft.com/rrasblog/2009/08/12/troubleshooting-common-vpn-related-errors/   
-http://www.tp-link.com/en/faq-1029.html
+* https://documentation.meraki.com/MX-Z/Client_VPN/Troubleshooting_Client_VPN#Common_Connection_Issues   
+* https://blogs.technet.microsoft.com/rrasblog/2009/08/12/troubleshooting-common-vpn-related-errors/   
+* http://www.tp-link.com/en/faq-1029.html
 
 ## Credits
 
-This document was adapted from the <a href="https://github.com/jlund/streisand" target="_blank">Streisand</a> project by Joshua Lund and contributors.
+This document was adapted from the <a href="https://github.com/jlund/streisand" target="_blank">Streisand</a> project, maintained by Joshua Lund and contributors.
 
 ## License
 

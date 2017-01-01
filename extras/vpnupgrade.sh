@@ -13,11 +13,11 @@
 # Check https://libreswan.org for the latest version
 swan_ver=3.18
 
-### Do not edit below this line ###
+### DO NOT edit below this line ###
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-exiterr()  { echo "Error: ${1}" >&2; exit 1; }
+exiterr()  { echo "Error: $1" >&2; exit 1; }
 exiterr2() { echo "Error: 'apt-get install' failed." >&2; exit 1; }
 
 os_type="$(lsb_release -si 2>/dev/null)"
@@ -37,13 +37,11 @@ if [ -z "$swan_ver" ]; then
   exiterr "Libreswan version 'swan_ver' not specified."
 fi
 
-/usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "Libreswan"
-if [ "$?" != "0" ]; then
+if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "Libreswan"; then
   exiterr "This script requires Libreswan already installed."
 fi
 
-/usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"
-if [ "$?" = "0" ]; then
+if /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"; then
   echo "You already have Libreswan version $swan_ver installed! "
   echo "If you continue, the same version will be re-installed."
   echo
@@ -114,8 +112,9 @@ apt-get -yq --no-install-recommends install xmlto || exiterr2
 swan_file="libreswan-$swan_ver.tar.gz"
 swan_url1="https://download.libreswan.org/$swan_file"
 swan_url2="https://github.com/libreswan/libreswan/archive/v$swan_ver.tar.gz"
-wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url1" || wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url2"
-[ "$?" != "0" ] && exiterr "Cannot download Libreswan source."
+if ! { wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url1" || wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url2"; }; then
+  exiterr "Cannot download Libreswan source."
+fi
 /bin/rm -rf "/opt/src/libreswan-$swan_ver"
 tar xzf "$swan_file" && /bin/rm -f "$swan_file"
 cd "libreswan-$swan_ver" || exiterr "Cannot enter Libreswan source dir."
@@ -128,8 +127,9 @@ make -s programs && make -s install
 # Verify the install and clean up
 cd /opt/src || exiterr "Cannot enter /opt/src."
 /bin/rm -rf "/opt/src/libreswan-$swan_ver"
-/usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"
-[ "$?" != "0" ] && exiterr "Libreswan $swan_ver failed to build."
+if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"; then
+  exiterr "Libreswan $swan_ver failed to build."
+fi
 
 # Restart IPsec service
 service ipsec restart
