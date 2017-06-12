@@ -2,7 +2,7 @@
 #
 # Script to upgrade Libreswan on CentOS and RHEL
 #
-# Copyright (C) 2016 Lin Song <linsongui@gmail.com>
+# Copyright (C) 2016-2017 Lin Song <linsongui@gmail.com>
 #
 # This work is licensed under the Creative Commons Attribution-ShareAlike 3.0
 # Unported License: http://creativecommons.org/licenses/by-sa/3.0/
@@ -11,7 +11,7 @@
 # know how you have improved it!
 
 # Check https://libreswan.org for the latest version
-swan_ver=3.18
+swan_ver=3.20
 
 ### DO NOT edit below this line ###
 
@@ -36,11 +36,11 @@ if [ -z "$swan_ver" ]; then
   exiterr "Libreswan version 'swan_ver' not specified."
 fi
 
-if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "Libreswan"; then
+if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -q "Libreswan"; then
   exiterr "This script requires Libreswan already installed."
 fi
 
-if /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"; then
+if /usr/local/sbin/ipsec --version 2>/dev/null | grep -qF "$swan_ver"; then
   echo "You already have Libreswan version $swan_ver installed! "
   echo "If you continue, the same version will be re-installed."
   echo
@@ -64,7 +64,30 @@ Welcome! This script will build and install Libreswan $swan_ver on your server.
 Additional packages required for Libreswan compilation will also be installed.
 
 This is intended for use on servers running an older version of Libreswan.
-Your existing VPN configuration files will NOT be modified.
+
+EOF
+
+cat <<'EOF'
+IMPORTANT NOTES:
+
+Libreswan versions 3.19 and newer require some configuration changes.
+This script will make the following changes to your /etc/ipsec.conf:
+
+Replace this line:
+  auth=esp
+with the following:
+  phase2=esp
+
+Replace this line:
+  forceencaps=yes
+with the following:
+  encapsulation=yes
+
+Consolidate VPN ciphers for "ike=" and "phase2alg=".
+Re-add "MODP1024" to the list of allowed "ike=" ciphers,
+which was removed from the defaults in Libreswan 3.19.
+
+Your other VPN configuration files will not be modified.
 
 EOF
 
@@ -108,8 +131,8 @@ fi
 
 # Compile and install Libreswan
 swan_file="libreswan-$swan_ver.tar.gz"
-swan_url1="https://download.libreswan.org/$swan_file"
-swan_url2="https://github.com/libreswan/libreswan/archive/v$swan_ver.tar.gz"
+swan_url1="https://github.com/libreswan/libreswan/archive/v$swan_ver.tar.gz"
+swan_url2="https://download.libreswan.org/$swan_file"
 if ! { wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url1" || wget -t 3 -T 30 -nv -O "$swan_file" "$swan_url2"; }; then
   exiterr "Cannot download Libreswan source."
 fi
@@ -122,7 +145,7 @@ make -s programs && make -s install
 # Verify the install and clean up
 cd /opt/src || exiterr "Cannot enter /opt/src."
 /bin/rm -rf "/opt/src/libreswan-$swan_ver"
-if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -qs "$swan_ver"; then
+if ! /usr/local/sbin/ipsec --version 2>/dev/null | grep -qF "$swan_ver"; then
   exiterr "Libreswan $swan_ver failed to build."
 fi
 
@@ -130,6 +153,15 @@ fi
 restorecon /etc/ipsec.d/*db 2>/dev/null
 restorecon /usr/local/sbin -Rv 2>/dev/null
 restorecon /usr/local/libexec/ipsec -Rv 2>/dev/null
+
+# Update ipsec.conf for Libreswan 3.19 and newer
+IKE_NEW="  ike=3des-sha1,3des-sha2,aes-sha1,aes-sha1;modp1024,aes-sha2,aes-sha2;modp1024,aes256-sha2_512"
+PHASE2_NEW="  phase2alg=3des-sha1,3des-sha2,aes-sha1,aes-sha2,aes256-sha2_512"
+sed -i".old-$(date +%Y-%m-%d-%H:%M:%S)" \
+    -e "s/^[[:space:]]\+auth=esp\$/  phase2=esp/" \
+    -e "s/^[[:space:]]\+forceencaps=yes\$/  encapsulation=yes/" \
+    -e "s/^[[:space:]]\+ike=.\+\$/$IKE_NEW/" \
+    -e "s/^[[:space:]]\+phase2alg=.\+\$/$PHASE2_NEW/" /etc/ipsec.conf
 
 # Restart IPsec service
 service ipsec restart

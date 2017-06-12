@@ -1,4 +1,4 @@
-﻿# 卸载 VPN
+# 卸载 VPN
 
 *其他语言版本: [English](uninstall.md), [简体中文](uninstall-zh.md).*
 
@@ -15,7 +15,7 @@
 
 ## 第一步
 
-```
+```bash
 service ipsec stop
 service xl2tpd stop
 rm -rf /usr/local/sbin/ipsec /usr/local/libexec/ipsec
@@ -69,7 +69,7 @@ rm -f /etc/init/ipsec.conf /lib/systemd/system/ipsec.service \
 
 要快速删除，可以复制并粘贴以下命令：
 
-```
+```bash
 rm -f /etc/ipsec.conf* /etc/ipsec.secrets* /etc/ppp/chap-secrets* /etc/ppp/options.xl2tpd* \
       /etc/pam.d/pluto /etc/sysconfig/pluto /etc/default/pluto
 rm -rf /etc/ipsec.d /etc/xl2tpd

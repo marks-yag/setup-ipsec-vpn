@@ -1,10 +1,10 @@
-﻿# 配置 IPsec/L2TP VPN 客户端
+# 配置 IPsec/L2TP VPN 客户端
 
 *其他语言版本: [English](clients.md), [简体中文](clients-zh.md).*
 
 *注: 你也可以使用 [IPsec/XAuth 模式](clients-xauth-zh.md) 连接，或者配置 [IKEv2](ikev2-howto-zh.md)。*
 
-在成功<a href="https://github.com/hwdsl2/setup-ipsec-vpn" target="_blank">搭建自己的 VPN 服务器</a>之后，你可以按照下面的步骤来配置你的设备。IPsec/L2TP 在 Android, iOS, OS X 和 Windows 上均受支持，无需安装额外的软件。设置过程通常只需要几分钟。如果无法连接,请首先检查是否输入了正确的 VPN 登录凭证。
+在成功<a href="https://github.com/hwdsl2/setup-ipsec-vpn/blob/master/README-zh.md" target="_blank">搭建自己的 VPN 服务器</a>之后，你可以按照下面的步骤来配置你的设备。IPsec/L2TP 在 Android, iOS, OS X 和 Windows 上均受支持，无需安装额外的软件。设置过程通常只需要几分钟。如果无法连接,请首先检查是否输入了正确的 VPN 登录凭证。
 
 另一个带图片的<a href="https://usefulpcguide.com/17318/create-your-own-vpn/" target="_blank">安装指南</a>可供参考，它由 Tony Tran 编写。
 
@@ -21,7 +21,9 @@
   * [Windows 错误 809](#windows-错误-809)
   * [Windows 错误 628](#windows-错误-628)
   * [Android 6 and 7](#android-6-and-7)
+  * [Chromebook](#chromebook)
   * [其它错误](#其它错误)
+  * [额外的步骤](#额外的步骤)
 
 ## Windows
 
@@ -42,6 +44,8 @@
 1. 单击 **使用预共享密钥作身份验证** 并在 **密钥** 字段中输入`你的 VPN IPsec PSK`。
 1. 单击 **确定** 关闭 **高级设置**。
 1. 单击 **确定** 保存 VPN 连接的详细信息。
+
+**注：** 在首次连接之前需要修改一次注册表。请参见下面的说明。
 
 ### Windows 7, Vista and XP
 
@@ -68,6 +72,8 @@
 1. 单击 **使用预共享密钥作身份验证** 并在 **密钥** 字段中输入`你的 VPN IPsec PSK`。
 1. 单击 **确定** 关闭 **高级设置**。
 1. 单击 **确定** 保存 VPN 连接的详细信息。
+
+**注：** 在首次连接之前需要<a href="#windows-错误-809">修改一次注册表</a>，以解决 VPN 服务器 和/或 客户端与 NAT （比如家用路由器）的兼容问题。
 
 要连接到 VPN： 单击系统托盘中的无线/网络图标，选择新的 VPN 连接，然后单击 **连接**。如果出现提示，在登录窗口中输入 `你的 VPN 用户名` 和 `密码` ，并单击 **确定**。最后你可以到 <a href="https://www.ipchicken.com" target="_blank">这里</a> 检测你的 IP 地址，应该显示为`你的 VPN 服务器 IP`。
 
@@ -148,17 +154,19 @@ VPN 连接成功后，会在通知栏显示图标。最后你可以到 <a href="
 
 VPN 连接成功后，网络状态图标上会出现 VPN 指示。最后你可以到 <a href="https://www.ipchicken.com" target="_blank">这里</a> 检测你的 IP 地址，应该显示为`你的 VPN 服务器 IP`。
 
+如果在连接过程中遇到错误，请参见 <a href="#故障排除">故障排除</a>。
+
 ## Windows Phone
 
 Windows Phone 8.1 及以上版本用户可以尝试按照 <a href="http://forums.windowscentral.com/windows-phone-8-1-preview-developers/301521-tutorials-windows-phone-8-1-support-l2tp-ipsec-vpn-now.html" target="_blank">这个教程</a> 的步骤操作。最后你可以到 <a href="https://www.ipchicken.com" target="_blank">这里</a> 检测你的 IP 地址，应该显示为`你的 VPN 服务器 IP`。
 
 ## Linux
 
-注： 以下步骤是在 [Peter Sanford 的工作](https://gist.github.com/psanford/42c550a1a6ad3cb70b13e4aaa94ddb1c) 基础上修改。这些命令必须在你的 VPN 客户端上使用 `root` 账户运行。
+以下步骤是基于 [Peter Sanford 的工作](https://gist.github.com/psanford/42c550a1a6ad3cb70b13e4aaa94ddb1c)。这些命令必须在你的 VPN 客户端上使用 `root` 账户运行。
 
 要配置 VPN 客户端，首先安装以下软件包：
 
-```
+```bash
 # Ubuntu & Debian
 apt-get update
 apt-get -y install strongswan xl2tpd
@@ -173,7 +181,7 @@ yum -y install strongswan xl2tpd
 
 创建 VPN 变量 （替换为你自己的值）：
 
-```
+```bash
 VPN_SERVER_IP='your_vpn_server_ip'
 VPN_IPSEC_PSK='your_ipsec_pre_shared_key'
 VPN_USER='your_vpn_username'
@@ -181,7 +189,8 @@ VPN_PASSWORD='your_vpn_password'
 ```
 
 配置 strongSwan：
-```
+
+```bash
 cat > /etc/ipsec.conf <<EOF
 # ipsec.conf - strongSwan IPsec configuration file
 
@@ -230,7 +239,8 @@ ln -s /etc/ipsec.secrets /etc/strongswan/ipsec.secrets
 ```
 
 配置 xl2tpd：
-```
+
+```bash
 cat > /etc/xl2tpd/xl2tpd.conf <<EOF
 [lac myvpn]
 lns = $VPN_SERVER_IP
@@ -261,20 +271,25 @@ chmod 600 /etc/ppp/options.l2tpd.client
 
 至此 VPN 客户端配置已完成。按照下面的步骤进行连接。
 
+**注：** 当你每次尝试连接到 VPN 时，必须重复下面的所有步骤。
+
 创建 xl2tpd 控制文件：
-```
+
+```bash
 mkdir -p /var/run/xl2tpd
 touch /var/run/xl2tpd/l2tp-control
 ```
 
 重启服务：
-```
+
+```bash
 service strongswan restart
 service xl2tpd restart
 ```
 
 开始 IPsec 连接：
-```
+
+```bash
 # Ubuntu & Debian
 ipsec up myvpn
 
@@ -283,36 +298,42 @@ strongswan up myvpn
 ```
 
 开始 L2TP 连接：
-```
+
+```bash
 echo "c myvpn" > /var/run/xl2tpd/l2tp-control
 ```
 
 运行 `ifconfig` 并且检查输出。现在你应该看到一个新的网络接口 `ppp0`。
 
 检查你现有的默认路由：
-```
+
+```bash
 ip route
 ```
 
 在输出中查找以下行： `default via X.X.X.X ...`。记下这个网关 IP，并且在下面的两个命令中使用。
 
 从新的默认路由中排除你的 VPN 服务器 IP （替换为你自己的值）：
-```
+
+```bash
 route add YOUR_VPN_SERVER_IP gw X.X.X.X
 ```
 
 如果你的 VPN 客户端是一个远程服务器，则必须从新的默认路由中排除你本地电脑的公有 IP，以避免 SSH 会话被断开 （替换为你自己的公有 IP，可在 <a href="https://www.ipchicken.com" target="_blank">这里</a> 查看）：
-```
+
+```bash
 route add YOUR_LOCAL_PC_PUBLIC_IP gw X.X.X.X
 ```
 
 添加一个新的默认路由，并且开始通过 VPN 服务器发送数据：
-```
+
+```bash
 route add default dev ppp0
 ```
 
 至此 VPN 连接已成功完成。检查 VPN 是否正常工作：
-```
+
+```bash
 wget -qO- http://ipv4.icanhazip.com; echo
 ```
 
@@ -320,12 +341,14 @@ wget -qO- http://ipv4.icanhazip.com; echo
 
 
 要停止通过 VPN 服务器发送数据：
-```
+
+```bash
 route del default dev ppp0
 ```
 
 要断开连接：
-```
+
+```bash
 # Ubuntu & Debian
 echo "d myvpn" > /var/run/xl2tpd/l2tp-control
 ipsec down myvpn
@@ -377,17 +400,60 @@ strongswan down myvpn
 如果你无法使用 Android 6 (Marshmallow) 或者 7 (Nougat) 连接：
 
 1. 单击 VPN 连接旁边的设置按钮，选择 "Show advanced options" 并且滚动到底部。如果选项 "Backward compatible mode" 存在，请启用它并重试连接。如果不存在，请尝试下一步。
-1. 编辑 VPN 服务器上的 `/etc/ipsec.conf`。找到这一行 `phase2alg=...`，然后在它下面添加一行 `sha2-truncbug=yes`，开头必须空两格。保存修改并运行 `service ipsec restart`。(<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">参见</a>)
+1. **注：** 最新版本的 VPN 脚本已经包含这个更改。   
+   （适用于 Android 7.1.2 及以上版本） 编辑 VPN 服务器上的 `/etc/ipsec.conf`。在 `ike=` 和 `phase2alg=` 两行的末尾添加 `,aes256-sha2_512` 字样。保存修改并运行 `service ipsec restart`。(<a href="https://github.com/hwdsl2/setup-ipsec-vpn/commit/f58afbc84ba421216ca2615d3e3654902e9a1852" target="_blank">参见</a>)
+1. 编辑 VPN 服务器上的 `/etc/ipsec.conf`。找到 `sha2-truncbug=yes` 并将它替换为 `sha2-truncbug=no`，开头必须空两格。保存修改并运行 `service ipsec restart`。(<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">参见</a>)
 
 ![Android VPN workaround](images/vpn-profile-Android.png)
 
+### Chromebook
+
+Chromebook 用户： 如果你无法连接，请尝试 <a href="https://bugs.chromium.org/p/chromium/issues/detail?id=707139#c58" target="_blank">这个解决方案</a>。或者你也可以尝试编辑 VPN 服务器上的 `/etc/ipsec.conf`，找到 `sha2-truncbug=yes` 并将它替换为 `sha2-truncbug=no`。保存修改并运行 `service ipsec restart`。
+
 ### 其它错误
 
-更多的故障排除信息请参见以下链接：
+如果你遇到其它错误，请参见以下链接：
 
 * https://documentation.meraki.com/MX-Z/Client_VPN/Troubleshooting_Client_VPN#Common_Connection_Issues   
 * https://blogs.technet.microsoft.com/rrasblog/2009/08/12/troubleshooting-common-vpn-related-errors/   
 * http://www.tp-link.com/en/faq-1029.html
+
+### 额外的步骤
+
+请尝试下面这些额外的故障排除步骤：
+
+首先，重启 VPN 服务器上的相关服务：
+
+```bash
+service ipsec restart
+service xl2tpd restart
+```
+
+如果你使用 Docker，请运行 `docker restart ipsec-vpn-server`。
+
+然后重启你的 VPN 客户端设备，并重试连接。如果仍然无法连接，可以尝试删除并重新创建 VPN 连接，按照本文档中的步骤操作。请确保输入了正确的 VPN 登录凭证。
+
+检查 Libreswan (IPsec) 日志是否有错误：
+
+```bash
+# Ubuntu & Debian
+grep pluto /var/log/auth.log
+# CentOS & RHEL
+grep pluto /var/log/secure
+```
+
+查看 IPsec VPN 服务器状态：
+
+```bash
+ipsec status
+ipsec verify
+```
+
+显示当前已建立的 VPN 连接：
+
+```bash
+ipsec whack --trafficstatus
+```
 
 ## 致谢
 
@@ -397,7 +463,7 @@ strongswan down myvpn
 
 注： 这个协议仅适用于本文档。
 
-版权所有 (C) 2016 Lin Song   
+版权所有 (C) 2016-2017 Lin Song   
 基于 <a href="https://github.com/jlund/streisand/blob/master/playbooks/roles/l2tp-ipsec/templates/instructions.md.j2" target="_blank">Joshua Lund 的工作</a> (版权所有 2014-2016)
 
 本程序为自由软件，在自由软件联盟发布的<a href="https://www.gnu.org/licenses/gpl.html" target="_blank"> GNU 通用公共许可协议</a>的约束下，你可以对其进行再发布及修改。协议版本为第三版或（随你）更新的版本。

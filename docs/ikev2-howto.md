@@ -1,10 +1,10 @@
-﻿# How-To: IKEv2 VPN for Windows 7 and newer
+# How-To: IKEv2 VPN for Windows and Android
 
 *Read this in other languages: [English](ikev2-howto.md), [简体中文](ikev2-howto-zh.md).*
 
 ---
 
-**IMPORTANT:** This guide is for **Advanced Users** ONLY. Other users please use <a href="clients.md" target="_blank">IPsec/L2TP</a> or <a href="clients-xauth.md" target="_blank">IPsec/XAuth</a>.
+**IMPORTANT:** This guide is for **advanced users** only. Other users please use <a href="clients.md" target="_blank">IPsec/L2TP</a> or <a href="clients-xauth.md" target="_blank">IPsec/XAuth</a>.
 
 ---
 
@@ -15,22 +15,21 @@ Libreswan can authenticate IKEv2 clients on the basis of X.509 Machine Certifica
 - Windows 7, 8.x and 10
 - Windows Phone 8.1 and above
 - strongSwan Android VPN client
-- <a href="https://github.com/gaomd/docker-ikev2-vpn-server">iOS (iPhone/iPad) and OS X (macOS)</a> <-- See link
+- <a href="https://github.com/gaomd/docker-ikev2-vpn-server" target="_blank">iOS (iPhone/iPad) and macOS</a> <-- See also
 
 The following example shows how to configure IKEv2 with Libreswan. Commands below must be run as `root`.
 
 Before continuing, make sure you have successfully <a href="https://github.com/hwdsl2/setup-ipsec-vpn" target="_blank">set up your VPN server</a>.
 
-1. Find the public and private IP of your server, and make sure they are not empty. It is OK if they are the same.
+1. Find the VPN server's public IP, save it to a variable and check.
 
    ```bash
    $ PUBLIC_IP=$(wget -t 3 -T 15 -qO- http://ipv4.icanhazip.com)
-   $ PRIVATE_IP=$(ip -4 route get 1 | awk '{print $NF;exit}')
    $ echo "$PUBLIC_IP"
-   (Your public IP is displayed)
-   $ echo "$PRIVATE_IP"
-   (Your private IP is displayed)
+   (Check the displayed public IP)
    ```
+
+   **Note:** Alternatively, you may specify the server's DNS name here. e.g. `PUBLIC_IP=myvpn.example.com`.
 
 1. Add a new IKEv2 connection to `/etc/ipsec.conf`:
 
@@ -38,7 +37,7 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
    $ cat >> /etc/ipsec.conf <<EOF
 
    conn ikev2-cp
-     left=$PRIVATE_IP
+     left=%defaultroute
      leftcert=$PUBLIC_IP
      leftid=@$PUBLIC_IP
      leftsendcert=always
@@ -58,14 +57,32 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
      ikev2=insist
      rekey=no
      fragmentation=yes
-     forceencaps=yes
-     ike=3des-sha1,aes-sha1,aes256-sha2_512,aes256-sha2_256
-     phase2alg=3des-sha1,aes-sha1,aes256-sha2_512,aes256-sha2_256
+     ike=3des-sha1,3des-sha2,aes-sha1,aes-sha1;modp1024,aes-sha2,aes-sha2;modp1024,aes256-sha2_512
+     phase2alg=3des-sha1,3des-sha2,aes-sha1,aes-sha2,aes256-sha2_512
    EOF
    ```
 
-1. Generate Certificate Authority (CA) and VPN server certificates:   
-   Note: Specify the certificate validity period (in months) using "-v". e.g. "-v 36".
+   We need to add one more line to that file. First check your Libreswan version:
+
+   ```bash
+   $ ipsec --version
+   ```
+
+   For Libreswan 3.19 and newer, run command:
+
+   ```bash
+   $ echo " encapsulation=yes" >> /etc/ipsec.conf
+   ```
+
+   For Libreswan 3.18 and older, run command:
+
+   ```bash
+   $ echo " forceencaps=yes" >> /etc/ipsec.conf
+   ```
+
+1. Generate Certificate Authority (CA) and VPN server certificates:
+
+   **Note:** Specify the certificate validity period (in months) using "-v". e.g. "-v 36". In addition, if you specified the server's DNS name (instead of its IP address) in step 1 above, replace `--extSAN "ip:$PUBLIC_IP,dns:$PUBLIC_IP"` with `--extSAN "dns:$PUBLIC_IP"` in the command below.
 
    ```bash
    $ certutil -S -x -n "Example CA" -s "O=Example,CN=Example CA" -k rsa -g 4096 -v 36 -d sql:/etc/ipsec.d -t "CT,," -2
@@ -91,7 +108,30 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
    Is this a critical extension [y/N]?
    N
 
-   $ certutil -S -c "Example CA" -n "$PUBLIC_IP" -s "O=Example,CN=$PUBLIC_IP" -k rsa -g 4096 -v 36 -d sql:/etc/ipsec.d -t ",," -1 -6 -8 "$PUBLIC_IP"
+   $ certutil -S -c "Example CA" -n "$PUBLIC_IP" -s "O=Example,CN=$PUBLIC_IP" -k rsa -g 4096 -v 36 -d sql:/etc/ipsec.d -t ",," \
+      --keyUsage digitalSignature,keyEncipherment --extKeyUsage serverAuth --extSAN "ip:$PUBLIC_IP,dns:$PUBLIC_IP"
+
+   A random seed must be generated that will be used in the
+   creation of your key.  One of the easiest ways to create a
+   random seed is to use the timing of keystrokes on a keyboard.
+
+   To begin, type keys on the keyboard until this progress meter
+   is full.  DO NOT USE THE AUTOREPEAT FUNCTION ON YOUR KEYBOARD!
+
+   Continue typing until the progress meter is full:
+
+   |************************************************************|
+
+   Finished.  Press enter to continue:
+
+   Generating key.  This may take a few moments...
+   ```
+
+1. Generate client certificate(s), and export the `.p12` file that contains the client certificate, private key, and CA certificate:
+
+   ```bash
+   $ certutil -S -c "Example CA" -n "vpnclient" -s "O=Example,CN=vpnclient" -k rsa -g 4096 -v 36 -d sql:/etc/ipsec.d -t ",," \
+      --keyUsage digitalSignature,keyEncipherment --extKeyUsage serverAuth,clientAuth -8 "vpnclient"
 
    A random seed must be generated that will be used in the
    creation of your key.  One of the easiest ways to create a
@@ -108,66 +148,6 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
 
    Generating key.  This may take a few moments...
 
-                   0 - Digital Signature
-                   1 - Non-repudiation
-                   2 - Key encipherment
-                   3 - Data encipherment
-                   4 - Key agreement
-                   5 - Cert signing key
-                   6 - CRL signing key
-                   Other to finish
-    > 0
-                   0 - Digital Signature
-                   1 - Non-repudiation
-                   2 - Key encipherment
-                   3 - Data encipherment
-                   4 - Key agreement
-                   5 - Cert signing key
-                   6 - CRL signing key
-                   Other to finish
-    > 2
-                   0 - Digital Signature
-                   1 - Non-repudiation
-                   2 - Key encipherment
-                   3 - Data encipherment
-                   4 - Key agreement
-                   5 - Cert signing key
-                   6 - CRL signing key
-                   Other to finish
-    > 8
-   Is this a critical extension [y/N]?
-   N
-                   0 - Server Auth
-                   1 - Client Auth
-                   2 - Code Signing
-                   3 - Email Protection
-                   4 - Timestamp
-                   5 - OCSP Responder
-                   6 - Step-up
-                   7 - Microsoft Trust List Signing
-                   Other to finish
-    > 0
-                   0 - Server Auth
-                   1 - Client Auth
-                   2 - Code Signing
-                   3 - Email Protection
-                   4 - Timestamp
-                   5 - OCSP Responder
-                   6 - Step-up
-                   7 - Microsoft Trust List Signing
-                   Other to finish
-    > 8
-   Is this a critical extension [y/N]?
-   N
-   ```
-
-1. Generate client certificate(s), and export the `.p12` file that contains the client certificate, private key, and CA certificate:
-
-   ```bash
-   $ certutil -S -c "Example CA" -n "vpnclient" -s "O=Example,CN=vpnclient" -k rsa -g 4096 -v 36 -d sql:/etc/ipsec.d -t ",," -1 -6 -8 "vpnclient"
-
-   -- repeat same extensions as above --
-
    $ pk12util -o vpnclient.p12 -n "vpnclient" -d sql:/etc/ipsec.d
 
    Enter password for PKCS12 file:
@@ -176,6 +156,8 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
    ```
 
    Repeat this step for additional VPN clients, but replace every `vpnclient` with `vpnclient2`, etc.
+
+   **Note:** If you wish to connect multiple VPN clients simultaneously, you must generate a unique certificate for each.
 
 1. The database should now contain:
 
@@ -190,7 +172,7 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
    vpnclient                                          u,u,u
    ```
 
-   Note: To delete a certificate, use `certutil -D -d sql:/etc/ipsec.d -n "Certificate Nickname"`.
+   **Note:** To display a certificate, use `certutil -L -d sql:/etc/ipsec.d -n "Nickname"`. To delete a certificate, replace `-L` with `-D`. For other `certutil` usage, read <a href="http://manpages.ubuntu.com/manpages/zesty/man1/certutil.1.html" target="_blank">this page</a>.
 
 1. Restart IPsec service:
 
@@ -202,32 +184,38 @@ Before continuing, make sure you have successfully <a href="https://github.com/h
 
    #### Windows 7, 8.x and 10
 
-   Import the `.p12` file to the Computer certificate store. The CA cert once imported must be placed into the "Certificates" sub-folder under "Trusted Root Certification Authorities".
+   1. Import the `.p12` file to the "Computer account" certificate store. Make sure that the client cert is placed in "Personal -> Certificates", and the CA cert is placed in "Trusted Root Certification Authorities -> Certificates".
 
-   Detailed instructions:   
-   https://wiki.strongswan.org/projects/strongswan/wiki/Win7Certs
+      Detailed instructions:   
+      https://wiki.strongswan.org/projects/strongswan/wiki/Win7Certs
 
-   On the Windows computer, add a new IKEv2 VPN connection：
+   1. On the Windows computer, add a new IKEv2 VPN connection：   
+      https://wiki.strongswan.org/projects/strongswan/wiki/Win7Config
 
-   https://wiki.strongswan.org/projects/strongswan/wiki/Win7Config
+   1. Start the new IKEv2 VPN connection, and enjoy your VPN!   
+      https://wiki.strongswan.org/projects/strongswan/wiki/Win7Connect
 
-   Start the new IKEv2 VPN connection, and enjoy your own VPN!
+   1. (Optional) You may enable stronger ciphers by adding <a href="https://wiki.strongswan.org/projects/strongswan/wiki/Windows7#AES-256-CBC-and-MODP2048" target="_blank">this registry key</a> and reboot.
 
-   https://wiki.strongswan.org/projects/strongswan/wiki/Win7Connect
+   #### Android 4.x and newer
+
+   1. Install <a href="https://play.google.com/store/apps/details?id=org.strongswan.android" target="_blank">strongSwan VPN Client</a> from **Google Play**.
+   1. Launch the VPN client and tap **Add VPN Profile**.
+   1. Enter `Your VPN Server IP` in the **Server** field.
+   1. Select **IKEv2 Certificate** from the **VPN Type** drop-down menu.
+   1. Tap to add a **User certificate**, then tap **Install**.
+   1. Choose the `.p12` file you copied from the VPN server, and follow the prompts.
+   1. Save the new VPN connection, then tap to connect.
 
    #### Windows Phone 8.1 and above
 
    First import the `.p12` file, then follow <a href="https://technet.microsoft.com/en-us/windows/dn673608.aspx" target="_blank">these instructions</a> to configure a certificate-based IKEv2 VPN.
 
-   #### Android 4.x and newer
-
-   Please refer to: https://wiki.strongswan.org/projects/strongswan/wiki/AndroidVpnClient
-
-   Once successfully connected, you can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
+1. Once successfully connected, you can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
 
 ## Known Issues
 
-The built-in VPN client in Windows 7 and newer does not support IKEv2 fragmentation. On some networks, this can cause the connection to fail with "Error 809", or you may be unable to open any website after connecting. If this happens, first try <a href="clients.md#troubleshooting" target="_blank">this workaround</a>. If it doesn't work, please connect using <a href="clients.md" target="_blank">IPsec/L2TP</a> or <a href="clients-xauth.md" target="_blank">IPsec/XAuth</a> mode instead.
+The built-in VPN client in Windows does not support IKEv2 fragmentation. On some networks, this can cause the connection to fail or have other issues. You may try <a href="clients.md#troubleshooting" target="_blank">this registry fix</a>, or connect using <a href="clients.md" target="_blank">IPsec/L2TP</a> or <a href="clients-xauth.md" target="_blank">IPsec/XAuth</a> mode instead.
 
 ## References
 
@@ -235,3 +223,4 @@ The built-in VPN client in Windows 7 and newer does not support IKEv2 fragmentat
 * https://libreswan.org/wiki/HOWTO:_Using_NSS_with_libreswan
 * https://libreswan.org/man/ipsec.conf.5.html
 * https://wiki.strongswan.org/projects/strongswan/wiki/Windows7
+* https://wiki.strongswan.org/projects/strongswan/wiki/AndroidVpnClient

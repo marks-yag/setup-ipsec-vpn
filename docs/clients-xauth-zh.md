@@ -1,12 +1,12 @@
-﻿# 配置 IPsec/XAuth VPN 客户端
+# 配置 IPsec/XAuth VPN 客户端
 
 *其他语言版本: [English](clients-xauth.md), [简体中文](clients-xauth-zh.md).*
 
 *注: 你也可以使用 [IPsec/L2TP 模式](clients-zh.md) 连接，或者配置 [IKEv2](ikev2-howto-zh.md)。*
 
-在成功<a href="https://github.com/hwdsl2/setup-ipsec-vpn" target="_blank">搭建自己的 VPN 服务器</a>之后，你可以按照下面的步骤来配置你的设备。IPsec/XAuth ("Cisco IPsec") 在 Android, iOS 和 OS X 上均受支持，无需安装额外的软件。Windows 用户可以使用免费的 <a href="https://www.shrew.net/download/vpn" target="_blank">Shrew Soft 客户端</a>。如果无法连接,请首先检查是否输入了正确的 VPN 登录凭证。
+在成功<a href="https://github.com/hwdsl2/setup-ipsec-vpn/blob/master/README-zh.md" target="_blank">搭建自己的 VPN 服务器</a>之后，你可以按照下面的步骤来配置你的设备。IPsec/XAuth ("Cisco IPsec") 在 Android, iOS 和 OS X 上均受支持，无需安装额外的软件。Windows 用户可以使用免费的 <a href="https://www.shrew.net/download/vpn" target="_blank">Shrew Soft 客户端</a>。如果无法连接,请首先检查是否输入了正确的 VPN 登录凭证。
 
-IPsec/XAuth 模式也称为 "Cisco IPsec"，它通常能够比 IPsec/L2TP 更高效地传输数据。
+IPsec/XAuth 模式也称为 "Cisco IPsec"。该模式通常能够比 IPsec/L2TP 更高效地传输数据。
 
 ---
 * 平台名称
@@ -19,7 +19,8 @@ IPsec/XAuth 模式也称为 "Cisco IPsec"，它通常能够比 IPsec/L2TP 更高
 
 **注:** 你也可以使用 [IPsec/L2TP 模式](clients-zh.md) 连接，无需安装额外的软件。
 
-1. 下载并安装免费的 <a href="https://www.shrew.net/download/vpn" target="_blank">Shrew Soft VPN 客户端</a>。
+1. 下载并安装免费的 <a href="https://www.shrew.net/download/vpn" target="_blank">Shrew Soft VPN 客户端</a>。   
+   **注：** 该 VPN 客户端支持 Windows 2K/XP/Vista/7/8 系统。
 1. 单击开始菜单 -> 所有程序 -> ShrewSoft VPN Client -> VPN Access Manager
 1. 单击工具栏中的 **Add (+)** 按钮。
 1. 在 **Host Name or IP Address** 字段中输入`你的 VPN 服务器 IP`。
@@ -103,7 +104,7 @@ VPN 连接成功后，会在通知栏显示图标。最后你可以到 <a href="
 
 注： 这个协议仅适用于本文档。
 
-版权所有 (C) 2016 Lin Song   
+版权所有 (C) 2016-2017 Lin Song   
 基于 <a href="https://github.com/jlund/streisand/blob/master/playbooks/roles/l2tp-ipsec/templates/instructions.md.j2" target="_blank">Joshua Lund 的工作</a> (版权所有 2014-2016)
 
 本程序为自由软件，在自由软件联盟发布的<a href="https://www.gnu.org/licenses/gpl.html" target="_blank"> GNU 通用公共许可协议</a>的约束下，你可以对其进行再发布及修改。协议版本为第三版或（随你）更新的版本。

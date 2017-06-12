@@ -1,4 +1,4 @@
-﻿# Configure IPsec/L2TP VPN Clients
+# Configure IPsec/L2TP VPN Clients
 
 *Read this in other languages: [English](clients.md), [简体中文](clients-zh.md).*
 
@@ -21,7 +21,9 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
   * [Windows Error 809](#windows-error-809)
   * [Windows Error 628](#windows-error-628)
   * [Android 6 and 7](#android-6-and-7)
-  * [Other Errors](#other-errors)
+  * [Chromebook](#chromebook)
+  * [Other errors](#other-errors)
+  * [Additional steps](#additional-steps)
 
 ## Windows
 
@@ -42,6 +44,8 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
 1. Select **Use preshared key for authentication** and enter `Your VPN IPsec PSK` for the **Key**.
 1. Click **OK** to close the **Advanced settings**.
 1. Click **OK** to save the VPN connection details.
+
+**Note:** A one-time registry change is required before connecting. See details below.
 
 ### Windows 7, Vista and XP
 
@@ -68,6 +72,8 @@ An alternative <a href="https://usefulpcguide.com/17318/create-your-own-vpn/" ta
 1. Select **Use preshared key for authentication** and enter `Your VPN IPsec PSK` for the **Key**.
 1. Click **OK** to close the **Advanced settings**.
 1. Click **OK** to save the VPN connection details.
+
+**Note:** This <a href="#windows-error-809">one-time registry change</a> is required if the VPN server and/or client is behind NAT (e.g. home router).
 
 To connect to the VPN: Click on the wireless/network icon in your system tray, select the new VPN entry, and click **Connect**. If prompted, enter `Your VPN Username` and `Password`, then click **OK**. You can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
 
@@ -148,17 +154,19 @@ Once connected, you will see a VPN icon in the status bar. You can verify that y
 
 Once connected, you will see a VPN icon overlay on the network status icon. You can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
 
+If you get an error when trying to connect, see <a href="#troubleshooting">Troubleshooting</a>.
+
 ## Windows Phone
 
 Users with Windows Phone 8.1 and above, try <a href="http://forums.windowscentral.com/windows-phone-8-1-preview-developers/301521-tutorials-windows-phone-8-1-support-l2tp-ipsec-vpn-now.html" target="_blank">this tutorial</a>. You can verify that your traffic is being routed properly by <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">looking up your IP address on Google</a>. It should say "Your public IP address is `Your VPN Server IP`".
 
 ## Linux
 
-Note: Instructions below are adapted from [the work of Peter Sanford](https://gist.github.com/psanford/42c550a1a6ad3cb70b13e4aaa94ddb1c). Commands must be run as `root` on your VPN client.
+Instructions below are based on [the work of Peter Sanford](https://gist.github.com/psanford/42c550a1a6ad3cb70b13e4aaa94ddb1c). Commands must be run as `root` on your VPN client.
 
 To set up the VPN client, first install the following packages:
 
-```
+```bash
 # Ubuntu & Debian
 apt-get update
 apt-get -y install strongswan xl2tpd
@@ -173,7 +181,7 @@ yum -y install strongswan xl2tpd
 
 Create VPN variables (replace with actual values):
 
-```
+```bash
 VPN_SERVER_IP='your_vpn_server_ip'
 VPN_IPSEC_PSK='your_ipsec_pre_shared_key'
 VPN_USER='your_vpn_username'
@@ -181,7 +189,8 @@ VPN_PASSWORD='your_vpn_password'
 ```
 
 Configure strongSwan:
-```
+
+```bash
 cat > /etc/ipsec.conf <<EOF
 # ipsec.conf - strongSwan IPsec configuration file
 
@@ -230,7 +239,8 @@ ln -s /etc/ipsec.secrets /etc/strongswan/ipsec.secrets
 ```
 
 Configure xl2tpd:
-```
+
+```bash
 cat > /etc/xl2tpd/xl2tpd.conf <<EOF
 [lac myvpn]
 lns = $VPN_SERVER_IP
@@ -261,20 +271,25 @@ chmod 600 /etc/ppp/options.l2tpd.client
 
 The VPN client setup is now complete. Follow the steps below to connect.
 
+**Note:** You must repeat all steps below every time you try to connect to the VPN.
+
 Create xl2tpd control file:
-```
+
+```bash
 mkdir -p /var/run/xl2tpd
 touch /var/run/xl2tpd/l2tp-control
 ```
 
 Restart services:
-```
+
+```bash
 service strongswan restart
 service xl2tpd restart
 ```
 
 Start the IPsec connection:
-```
+
+```bash
 # Ubuntu & Debian
 ipsec up myvpn
 
@@ -283,48 +298,56 @@ strongswan up myvpn
 ```
 
 Start the L2TP connection:
-```
+
+```bash
 echo "c myvpn" > /var/run/xl2tpd/l2tp-control
 ```
 
 Run `ifconfig` and check the output. You should now see a new interface `ppp0`.
 
 Check your existing default route:
-```
+
+```bash
 ip route
 ```
 
 Find this line in the output: `default via X.X.X.X ...`. Write down this gateway IP for use in the two commands below.
 
 Exclude your VPN server's IP from the new default route (replace with actual value):
-```
+
+```bash
 route add YOUR_VPN_SERVER_IP gw X.X.X.X
 ```
 
 If your VPN client is a remote server, you must also exclude your Local PC's public IP from the new default route, to prevent your SSH session from being disconnected (replace with your actual public IP <a href="https://encrypted.google.com/search?q=my+ip" target="_blank">from here</a>):
-```
+
+```bash
 route add YOUR_LOCAL_PC_PUBLIC_IP gw X.X.X.X
 ```
 
 Add a new default route to start routing traffic via the VPN server：
-```
+
+```bash
 route add default dev ppp0
 ```
 
 The VPN connection is now complete. Verify that your traffic is being routed properly:
-```
+
+```bash
 wget -qO- http://ipv4.icanhazip.com; echo
 ```
 
 The above command should return `Your VPN Server IP`.
 
 To stop routing traffic via the VPN server:
-```
+
+```bash
 route del default dev ppp0
 ```
 
 To disconnect:
-```
+
+```bash
 # Ubuntu & Debian
 echo "d myvpn" > /var/run/xl2tpd/l2tp-control
 ipsec down myvpn
@@ -376,17 +399,60 @@ To fix this error, please follow these steps:
 If you are unable to connect using Android 6 (Marshmallow) or 7 (Nougat):
 
 1. Tap the "Settings" icon next to your VPN profile. Select "Show advanced options" and scroll down to the bottom. If the option "Backward compatible mode" exists, enable it and reconnect the VPN. If not, try the next step.
-1. Edit `/etc/ipsec.conf` on the VPN server. Find the line `phase2alg=...`, and add a new line `sha2-truncbug=yes` immediately below it, indented with two spaces. Save the file and run `service ipsec restart`. (<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">Ref</a>)
+1. **Note:** The latest version of VPN scripts already includes this change.   
+   (For Android 7.1.2 and newer) Edit `/etc/ipsec.conf` on the VPN server. Append `,aes256-sha2_512` to the end of both `ike=` and `phase2alg=` lines. Save the file and run `service ipsec restart`. (<a href="https://github.com/hwdsl2/setup-ipsec-vpn/commit/f58afbc84ba421216ca2615d3e3654902e9a1852" target="_blank">Ref</a>)
+1. Edit `/etc/ipsec.conf` on the VPN server. Find `sha2-truncbug=yes` and replace it with `sha2-truncbug=no`, indented with two spaces. Save the file and run `service ipsec restart`. (<a href="https://libreswan.org/wiki/FAQ#Configuration_Matters" target="_blank">Ref</a>)
 
 ![Android VPN workaround](images/vpn-profile-Android.png)
 
-### Other Errors
+### Chromebook
 
-Refer to the links below for more troubleshooting tips:
+Chromebook users: If you are unable to connect, try <a href="https://bugs.chromium.org/p/chromium/issues/detail?id=707139#c58" target="_blank">this workaround</a>. Alternatively, edit `/etc/ipsec.conf` on the VPN server, find `sha2-truncbug=yes` and replace it with `sha2-truncbug=no`. Save the file and run `service ipsec restart`.
+
+### Other errors
+
+If you encounter other errors, refer to the links below:
 
 * https://documentation.meraki.com/MX-Z/Client_VPN/Troubleshooting_Client_VPN#Common_Connection_Issues   
 * https://blogs.technet.microsoft.com/rrasblog/2009/08/12/troubleshooting-common-vpn-related-errors/   
 * http://www.tp-link.com/en/faq-1029.html
+
+### Additional steps
+
+Please try these additional troubleshooting steps:
+
+First, restart services on the VPN server:
+
+```bash
+service ipsec restart
+service xl2tpd restart
+```
+
+If using Docker, run `docker restart ipsec-vpn-server`.
+
+Then reboot your VPN client device, and retry the connection. If still unable to connect, try removing and recreating the VPN connection, by following the instructions in this document. Make sure that the VPN credentials are entered correctly.
+
+Check the Libreswan (IPsec) log for errors:
+
+```bash
+# Ubuntu & Debian
+grep pluto /var/log/auth.log
+# CentOS & RHEL
+grep pluto /var/log/secure
+```
+
+Check status of the IPsec VPN server:
+
+```bash
+ipsec status
+ipsec verify
+```
+
+Show current established VPN connections:
+
+```bash
+ipsec whack --trafficstatus
+```
 
 ## Credits
 
@@ -396,7 +462,7 @@ This document was adapted from the <a href="https://github.com/jlund/streisand" 
 
 Note: This license applies to this document only.
 
-Copyright (C) 2016 Lin Song   
+Copyright (C) 2016-2017 Lin Song   
 Based on <a href="https://github.com/jlund/streisand/blob/master/playbooks/roles/l2tp-ipsec/templates/instructions.md.j2" target="_blank">the work of Joshua Lund</a> (Copyright 2014-2016)
 
 This program is free software: you can redistribute it and/or modify it under the terms of the <a href="https://www.gnu.org/licenses/gpl.html" target="_blank">GNU General Public License</a> as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
